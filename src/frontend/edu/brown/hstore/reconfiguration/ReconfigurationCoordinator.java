@@ -171,10 +171,12 @@ public class ReconfigurationCoordinator implements Shutdownable {
             LOG.info("Initializing reconfiguration. New reconfig plan.");
             if (this.hstore_site.getSiteId() == leaderId) {
                 // TODO : Check if more leader logic is needed
-                FileUtil.appendEventToFile("RECONFIG_INIT");
+                FileUtil.appendEventToFile(this.hstore_site.getSiteId() + " LEADER_RECONFIG_INIT");
                 if (debug.val) {
                     LOG.debug("Setting site as reconfig leader");
                 }
+            } else {
+            	FileUtil.appendEventToFile(this.hstore_site.getSiteId()+ " RECONFIG_INIT ");
             }
             this.reconfigurationLeader = leaderId;
             this.reconfigurationProtocol = reconfigurationProtocol;
@@ -269,7 +271,7 @@ public class ReconfigurationCoordinator implements Shutdownable {
                 
                 LOG.info("Last PE finished reconfiguration");
                 if(partitionId == this.reconfigurationLeader){
-                    FileUtil.appendEventToFile("RECONFIGURATION_"+ReconfigurationState.END);
+                    FileUtil.appendEventToFile(this.hstore_site.getSiteId() + " LEADER_RECONFIGURATION_"+ReconfigurationState.END);
                 }
                 resetReconfigurationInProgress();
             }
@@ -316,7 +318,8 @@ public class ReconfigurationCoordinator implements Shutdownable {
         	if (this.channels[destinationId] == null){
         		  LOG.error("Reconfig Leader Channel is null. " +  destinationId + " : " + this.channels);
         	} else{
-        		this.channels[destinationId].reconfigurationControlMsg(controller, leaderCallback, null);  
+        		this.channels[destinationId].reconfigurationControlMsg(controller, leaderCallback, null);
+        		FileUtil.appendEventToFile(this.hstore_site.getSiteId()+" RECONFIGURATION_" + ReconfigurationState.END.toString());
         	}
         }
     }
@@ -348,7 +351,7 @@ public class ReconfigurationCoordinator implements Shutdownable {
         LOG.info("Reconfiguration is done for the leader");
         if(reconfigurationDoneSites.size() == num_of_sites){
             LOG.info("All sites have reported that reconfiguration is complete "); 
-            FileUtil.appendEventToFile("RECONFIGURATION_" + ReconfigurationState.END.toString());
+            FileUtil.appendEventToFile(this.hstore_site.getSiteId()+" LEADER_RECONFIGURATION_" + ReconfigurationState.END.toString());
             LOG.info("Sending a message to notify all sites that reconfiguration has ended");
             sendReconfigEndAcknowledgementToAllSites();
         }
@@ -373,7 +376,7 @@ public class ReconfigurationCoordinator implements Shutdownable {
             LOG.info("Sending a message to notify all sites that reconfiguration has ended");
      
             sendReconfigEndAcknowledgementToAllSites();
-            FileUtil.appendEventToFile("RECONFIGURATION_" + ReconfigurationState.END.toString());
+            FileUtil.appendEventToFile(this.hstore_site.getSiteId() + " LEADER_RECONFIGURATION_" + ReconfigurationState.END.toString());
         }
     }
     
