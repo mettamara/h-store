@@ -128,7 +128,11 @@ def plotTSD(args, files, ax):
     end_legend = "Reconfig End"
     for x,(_file, df) in enumerate(dfs):
         name = os.path.basename(_file).split("-interval")[0] 
+        if args.recursive:
+            name = "%s-%s" % (name, os.path.dirname(_file).rsplit(os.path.sep,1)[1])   
+            LOG.info("Name now : %s " % name)
         color = COLORS[x % len(COLORS)]
+	linestyle = LINE_STYLES[x % len(LINE_STYLES)]
         colormap[name] = color   
         data[name] = df[TYPE_MAP[args.show]].values
         if args.reconfig:
@@ -144,7 +148,7 @@ def plotTSD(args, files, ax):
              
         if args.type == "line":
             #plot the line with the same color 
-            ax.plot(df.index, df[TYPE_MAP[args.show]], color=color,label=name, lw=2.0)
+            ax.plot(df.index, df[TYPE_MAP[args.show]], color=color,label=name,ls=linestyle, lw=2.0)
     plotFrame = pandas.DataFrame(data=data)
     if args.type == "line":
         pass
@@ -164,6 +168,8 @@ def plotter(args, files):
     
     if args.tsd:
         plotTSD(args, files, ax)   
+    else:
+        raise Exception("Only TSD supported")
     #LOG.debug("Files to plot %s" % (files))
 
     
@@ -177,7 +183,7 @@ if __name__=="__main__":
     if args.dir:
         if args.recursive:
             for _dir, _subdir, _files in os.walk(args.dir):
-                files = [os.path.join(_dir,x) for x in _files]
+                files.extend([os.path.join(_dir,x) for x in _files])
                 
         else:
             files = [os.path.join(args.dir,x) for x in os.listdir(args.dir)]
@@ -186,7 +192,7 @@ if __name__=="__main__":
     if args.filter:
         for filt in args.filter.split(","):
             files = [f for f in  files if filt not in f]
-    LOG.info("Files : %s " % ",".join(files) ) 
+    LOG.info("Files : %s " % "\n".join(files) ) 
     
     plotter(args, files)
     
