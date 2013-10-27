@@ -22,7 +22,7 @@ EXP_TYPES=( \
 )
 
 #for b in smallbank tpcc seats; do
-for b in tpcc ycsb; do
+for b in tpcc; do
 # for b in seats; do
     PARAMS=( \
         --no-update \
@@ -31,8 +31,7 @@ for b in tpcc ycsb; do
         --stop-on-error \
         --exp-trials=1 \
         --exp-attempts=1 \        
-	--sweep-reconfiguration \
-        --client.interval=1000 \
+        --client.interval=5000 \
         --client.output_interval=true \
         --client.duration=120000 \
         --client.warmup=60000 \
