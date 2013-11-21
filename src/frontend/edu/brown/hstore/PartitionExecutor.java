@@ -3466,6 +3466,10 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         assert(this.ee != null) : "The EE object is null. This is bad!";
         Long txn_id = ts.getTransactionId();
 
+        if (this.hstore_site.getReconfigurationCoordinator().getReconfigurationInProgress()) {
+            checkReconfigurationTracking(fragmentIds, parameterSets);
+        }
+        
         // *********************************** DEBUG ***********************************
         if (debug.val) {
             StringBuilder sb = new StringBuilder();
@@ -3637,7 +3641,8 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                     // FIXME make generic
                     if (trace.val)
                         LOG.trace(String.format("PE (%s) checking if key owned", this.partitionId));
-                    boolean keyOwned = this.reconfiguration_tracker.checkKeyOwned(offsetPair.getFirst(), (Long) parameterToCheck);
+                    boolean keyOwned = this.reconfiguration_tracker.checkKeyOwned(offsetPair.getFirst(), 
+                            parameterToCheck);
                     if (trace.val)
                         LOG.trace("Key owned " + keyOwned);
                     // Check with the reconfig tracking function if the values
