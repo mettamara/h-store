@@ -33,12 +33,14 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.DBBPool.BBContainer;
 
 import edu.brown.catalog.CatalogUtil;
+import edu.brown.hashing.AbstractHasher;
 import edu.brown.hstore.HStoreConstants;
 import edu.brown.hstore.Hstoreservice.Status;
 import edu.brown.hstore.conf.HStoreConf;
 import edu.brown.logging.LoggerUtil;
 import edu.brown.logging.LoggerUtil.LoggerBoolean;
 import edu.brown.profilers.ProfileMeasurement;
+import edu.brown.utils.ClassUtil;
 import edu.brown.utils.PartitionEstimator;
 
 /**
@@ -78,6 +80,7 @@ final class ClientImpl implements Client {
     private int m_partitionSiteXref[];
     private final HStoreConf m_hstoreConf;
     private final ProfileMeasurement m_queueTime = new ProfileMeasurement("queue");
+    private AbstractHasher hasher;
 
     /** Create a new client without any initial connections. */
     ClientImpl() {
@@ -125,7 +128,18 @@ final class ClientImpl implements Client {
         if (catalog != null && m_hstoreConf.client.txn_hints) {
             m_catalog = catalog;
             m_catalogContext = new CatalogContext(m_catalog);
-            m_pEstimator = new PartitionEstimator(m_catalogContext);
+            if(m_hstoreConf.global.reconfiguration_enable && m_hstoreConf.global.hasher_plan != null){
+                LOG.info("Client using non default hasher");
+                LOG.info("Using hasher class: " + m_hstoreConf.global.hasher_class );     
+                
+                this.hasher = ClassUtil.newInstance(m_hstoreConf.global.hasher_class,
+                                                     new Object[]{ m_catalogContext, m_catalogContext.numberOfPartitions , m_hstoreConf },
+                                                     new Class<?>[]{ CatalogContext.class, int.class, HStoreConf.class });
+                m_pEstimator = new PartitionEstimator(m_catalogContext, this.hasher);
+            } else {
+                m_pEstimator = new PartitionEstimator(m_catalogContext);
+                this.hasher = null;
+            }
             m_partitionSiteXref = CatalogUtil.getPartitionSiteXrefArray(m_catalog);
     }
 
