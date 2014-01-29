@@ -15,16 +15,17 @@ def plotBox(files,filedir,var):
     labels.append(f[0])
 
 
-  pylab.rc("axes", linewidth=2.0)
-  pylab.rc("lines", markeredgewidth=2.0)
+  rcParams.update(params)
+  pylab.rc("axes", linewidth=1.0)
+  pylab.rc("lines", markeredgewidth=1.0)
 
 
   
   plot.figure()
   ax = plot.subplot(111)
-  plot.title("Increasing Percent of Hotspot Operations in TPC-C", fontsize=16)
-  plot.xlabel("Percent of Operations for One Warehouse",fontsize='16')
-  plot.ylabel("TPS", fontsize='18')
+  #plot.title("Increasing Percent of Hotspot Operations in TPC-C", )
+  plot.xlabel("Percent of Operations for One Warehouse",)
+  plot.ylabel("TPS" )
   lines = ax.boxplot(data, notch=False, sym='', vert=1, whis=1.5,
       positions=None, widths=None, patch_artist=False, bootstrap = 5000)
   pylab.ylim([2000,4500])
@@ -37,18 +38,17 @@ def plotBox(files,filedir,var):
       for line in values:
         line.set_zorder(-100)
 
-  for tick in ax.yaxis.get_major_ticks():
-    tick.label1.set_fontsize('16')
-    tick.label2.set_fontsize('16')
+  #for tick in ax.yaxis.get_major_ticks():
+    #tick.label1.set_fontsize('16')
+    #tick.label2.set_fontsize('16')
 
    
-  labels = ax.set_xticklabels(labels , fontsize ='16')
+  labels = ax.set_xticklabels(labels  )
   #labels = ax.set_yticklabels(['2000','2500','3000','3500','4000','4500'] , fontsize ='16')
   #labels = ax.get_xticklabels()
   for label in ax.xaxis.get_ticklabels():
     label.set_rotation(0)
 
-  rcParams.update(params)
   plot.tight_layout()
 
   plot.savefig( "motivation.pdf", format = 'pdf')

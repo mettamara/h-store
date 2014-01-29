@@ -16,8 +16,10 @@ def plotTSD(files,filedir,var,ylabel,xlabel, ylim=None,xtrim=None, filename=None
   for f in files:
     _file = os.path.join(filedir,f[1])
     df = pandas.DataFrame.from_csv(_file,index_col=1)
-    if xtrim:
+    if isinstance(xtrim,int):
       df = df[:xtrim]
+    elif isinstance(xtrim,(list,tuple)):
+      df = df[xtrim[0]:xtrim[1]]
     #print var
     #print df[var].values
     data.append(df[var].values)
@@ -28,13 +30,19 @@ def plotTSD(files,filedir,var,ylabel,xlabel, ylim=None,xtrim=None, filename=None
     labels.append(f[0])
 
 
-  pylab.rc("axes", linewidth=2.0)
-  pylab.rc("lines", markeredgewidth=2.0)
+  #  params['figure.figsize'] = calcShortFigSize()
+  rcParams.update(params)
+  pylab.rc("axes", linewidth=1.0)
+  pylab.rc("lines", markeredgewidth=1.0)
 
-  plot.figure(figsize=calcShortFigSize())
+  f = plot.figure()
+  axarr =[]
+  axarr.append(plot.subplot(211))
+  axarr.append(plot.subplot(212))
+
   f,axarr = plot.subplots(len(data), sharex=True, sharey=True,)# figsize=calcShortFigSize())
-  plot.title("", fontsize=16)
-  plot.xlabel(xlabel,fontsize='16')
+  plot.title("", )
+  plot.xlabel(xlabel,)
   #f.text(0.06, 0.5, 'common ylabel', ha='center', va='center', rotation='vertical', fontsize='18')
   
   pylab.ylim(ylim)
@@ -54,16 +62,17 @@ def plotTSD(files,filedir,var,ylabel,xlabel, ylim=None,xtrim=None, filename=None
       lcolor ="red"
     else:
       lcolor ="blue"
-    ax.plot(df.index, _d, label=name, lw=1.5, color= lcolor,)
-    ax.set_ylabel(ylabel, fontsize='12')
+    ax.plot(df.index, _d, label=name, lw=1.0, color= lcolor,)
+    plot.subplots_adjust(hspace=0.001)
+    ax.set_ylabel(ylabel,)
     #ax.set_title(name)
-    ax.yaxis.set_major_locator(MaxNLocator(5))
-    ax.legend(loc=0,prop={'size':8})
+    ax.yaxis.set_major_locator(MaxNLocator(4))
+    ax.legend(loc=0)#,prop={'size':8})
 
     if len(r[r.RECONFIG.str.contains('TXN')]) == 1:
-      ax.axvline(r[r.RECONFIG.str.contains('TXN')].index[0], color=color, lw=1.5, linestyle="--",label=init_legend)
+      ax.axvline(r[r.RECONFIG.str.contains('TXN')].index[0], color=color, lw=1.0, linestyle="--",label=init_legend)
       if any(r.RECONFIG.str.contains('END')):
-          ax.axvline(r[r.RECONFIG.str.contains('END')].index[0], color=color, lw=1.5, linestyle=":",label=end_legend)
+          ax.axvline(r[r.RECONFIG.str.contains('END')].index[0], color=color, lw=1.0, linestyle=":",label=end_legend)
           end_legend = None
       else:
           LOG.error("*****************************************")
@@ -85,9 +94,7 @@ def plotTSD(files,filedir,var,ylabel,xlabel, ylim=None,xtrim=None, filename=None
     #label.set_rotation(0)
 
   
-  params['figure.figsize'] = calcShortFigSize()
-  rcParams.update(params)
-  plot.tight_layout()
+  f.tight_layout()
   print params
   if filename:
     plot.savefig(filename, format = 'pdf')
@@ -98,12 +105,12 @@ if __name__ == "__main__":
   import sys
 
   ycsb_files_zipf = [ 
-    ( "Stop and Copy YCSB (Zipfian)" , "stopcopy-ycsb-zipf/ycsb-08p-med4contract-interval_res.csv"),
-    ( "Squall YCSB (Zipfian)" , "reconfig-ycsb-zipf/ycsb-08p-med4contract-interval_res.csv"),
+    ( "Stop and Copy YCSB" , "stopcopy-ycsb-zipf/ycsb-08p-med4contract-interval_res.csv"),
+    ( "Squall YCSB" , "reconfig-ycsb-zipf/ycsb-08p-med4contract-interval_res.csv"),
   ]
   ycsb_uniform = [
-    ( "Stop and Copy YCSB (Uniform)" , "stopcopy-ycsb-uniform/ycsb-08p-med4contract-interval_res.csv"), 
-    ( "Squall YCSB (Uniform)" , "reconfig-ycsb-uniform/ycsb-08p-med4contract-interval_res.csv"), 
+    ( "Stop and Copy YCSB" , "stopcopy-ycsb-uniform/ycsb-08p-med4contract-interval_res.csv"), 
+    ( "Squall YCSB" , "reconfig-ycsb-uniform/ycsb-08p-med4contract-interval_res.csv"), 
   ] 
   
   filedir = "/home/aelmore/out/ycsb-dist-med4/out"
@@ -112,18 +119,68 @@ if __name__ == "__main__":
   var = "LATENCY"
   ylabel = "Latency (ms)"
   xlabel = "Elapsed Time (seconds)"
-  if len(sys.argv) < 2 or sys.argv[1] == "1":
-    plotTSD(ycsb_files_zipf,filedir,var, ylabel,xlabel, [0,50],180, "ycsbTSDmeanLat-8to4partitions-1gb-zipf")
-  if sys.argv[1] == "2":
-    plotTSD(ycsb_uniform,filedir,var, ylabel,xlabel, [0,50],180, "ycsbTSDmeanLat-8to4partitions-1gb-uniform")
+  plotTSD(ycsb_files_zipf,filedir,var, ylabel,xlabel, [0,50],(20,180), "ycsbTSDmeanLat-8to4partitions-1gb-zipf.pdf")
+  plotTSD(ycsb_uniform,filedir,var, ylabel,xlabel, [0,50],(20,140), "ycsbTSDmeanLat-8to4partitions-1gb-uniform.pdf")
   
   var = "THROUGHPUT"
   ylabel = "TPS"
   xlabel = "Elapsed Time (seconds)"
 
-  if sys.argv[1] == "3":
-    plotTSD(ycsb_files_zipf,filedir,var, ylabel,xlabel, [0,15000],180, "ycsbTSDmeanTPS-8to4partitions-1gb-zipf" )  
-  if sys.argv[1] == "4":
-    plotTSD(ycsb_uniform,filedir,var, ylabel,xlabel, [0,15000],180, "ycsbTSDmeanTPS-8to4partitions-1gbB-uniform" )  
+  plotTSD(ycsb_files_zipf,filedir,var, ylabel,xlabel, [0,15000],(20,180), "ycsbTSDmeanTPS-8to4partitions-1gb-zipf.pdf" )  
+  plotTSD(ycsb_uniform,filedir,var, ylabel,xlabel, [0,15000],(20,140), "ycsbTSDmeanTPS-8to4partitions-1gb-uniform.pdf" )  
 
+  #Expansion
+  ycsb_files_zipf = [ 
+    ( "Stop and Copy YCSB" , "stopcopy-ycsb-zipf/ycsb-08p-med2expand-interval_res.csv"),
+    ( "Squall YCSB" , "reconfig-ycsb-zipf/ycsb-08p-med2expand-interval_res.csv"),
+  ]
+  ycsb_uniform = [
+    ( "Stop and Copy YCSB" , "stopcopy-ycsb-uniform/ycsb-08p-med2expand-interval_res.csv"), 
+    ( "Squall YCSB" , "reconfig-ycsb-uniform/ycsb-08p-med2expand-interval_res.csv"), 
+  ] 
+  
+  filedir = "/home/aelmore/out/yexpand/out"
+
+  if not os.path.isdir(filedir):
+    raise Exception("Not a directory")
+  var = "LATENCY"
+  ylabel = "Latency (ms)"
+  xlabel = "Elapsed Time (seconds)"
+  plotTSD(ycsb_files_zipf,filedir,var, ylabel,xlabel, [0,50],(20,180), "ycsbTSDmeanLat-4to8partitions-1gb-zipf.pdf")
+  plotTSD(ycsb_uniform,filedir,var, ylabel,xlabel, [0,50],(40,180), "ycsbTSDmeanLat-4to8partitions-1gb-uniform.pdf")
+  
+  var = "THROUGHPUT"
+  ylabel = "TPS"
+  xlabel = "Elapsed Time (seconds)"
+
+  plotTSD(ycsb_files_zipf,filedir,var, ylabel,xlabel, [0,15000],(20,180), "ycsbTSDmeanTPS-4to8partitions-1gb-zipf.pdf" )  
+  plotTSD(ycsb_uniform,filedir,var, ylabel,xlabel, [0,15000],(40,180), "ycsbTSDmeanTPS-4to8partitions-1gb-uniform.pdf" )  
+
+
+  #Expansion partition
+  ycsb_files_zipf = [ 
+    ( "Stop and Copy YCSB" , "stopcopy-ycsb-zipf/ycsb-08p-med2expand6to8-interval_res.csv"),
+    ( "Squall YCSB" , "reconfig-ycsb-zipf/ycsb-08p-med2expand6to8-interval_res.csv"),
+  ]
+  ycsb_uniform = [
+    ( "Stop and Copy YCSB" , "stopcopy-ycsb-uniform/ycsb-08p-med2expand6to8-interval_res.csv"), 
+    ( "Squall YCSB" , "reconfig-ycsb-uniform/ycsb-08p-med2expand6to8-interval_res.csv"), 
+  ] 
+  
+  filedir = "/home/aelmore/out/yexpand-part/out"
+
+  if not os.path.isdir(filedir):
+    raise Exception("Not a directory")
+  var = "LATENCY"
+  ylabel = "Latency (ms)"
+  xlabel = "Elapsed Time (seconds)"
+  plotTSD(ycsb_files_zipf,filedir,var, ylabel,xlabel, [0,50],(20,180), "ycsbTSDmeanLat-6to8partitions-1gb-zipf.pdf")
+  plotTSD(ycsb_uniform,filedir,var, ylabel,xlabel, [0,50],(40,180), "ycsbTSDmeanLat-6to8partitions-1gb-uniform.pdf")
+  
+  var = "THROUGHPUT"
+  ylabel = "TPS"
+  xlabel = "Elapsed Time (seconds)"
+
+  plotTSD(ycsb_files_zipf,filedir,var, ylabel,xlabel, [0,15000],(20,180), "ycsbTSDmeanTPS-6to8partitions-1gb-zipf.pdf" )  
+  plotTSD(ycsb_uniform,filedir,var, ylabel,xlabel, [0,15000],(40,180), "ycsbTSDmeanTPS-6to8partitions-1gb-uniform.pdf" )  
 

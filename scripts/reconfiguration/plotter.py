@@ -167,6 +167,8 @@ def getIntStats(interval_file):
   df = pandas.DataFrame.from_csv(interval_file)  
   reconfig_events = getReconfigEvents(interval_file.replace("interval_res.csv", "hevent.log"))
   reconfig_details= getReconfigDetails(interval_file.replace("interval_res.csv", "hevent.log"))
+  if reconfig_events is None:
+    return None
   addReconfigEvent(df,reconfig_events)
 
   df['KB_PULLED'] = reconfig_details['pulledKB']
@@ -205,19 +207,19 @@ def getDirStat(directory,reconfigs, stops, show="mean", keepfilter=None, display
     df = getIntStats(interval_file)
     print interval_file 
 
-    if "recon" in interval_file:
+    if df is not None and "recon" in interval_file:
       alt_version = interval_file.replace("reconfig","stopcopy")
       if os.path.exists(alt_version):
         #only keep if we have both version of the same experiment
         adf = getIntStats(alt_version)
         reconfigs.append(getDFState(df,show))
         stops.append(getDFState(adf,show))
-    elif "stopcopy" in interval_file:
+    elif df is not None and "stopcopy" in interval_file:
       alt_version = interval_file.replace("stopcopy", "reconfig")
       print "Adding to stops", interval_file
       stops.append(getDFState(df,show))
 
-    if display:
+    if display and df is not None:
       printDFStat(df)
 
       if os.path.exists(alt_version):
@@ -240,6 +242,39 @@ def exploreDir(d, keepfilter=None):
         getDirStat(os.path.join(r,d),reconfigs,stops,"mean",keepfilter)
         print "-- --  " * 15
   return {"reconfigs": reconfigs, "stops": stops}      
+
+
+def getChange(record,attribute):
+  return ((record.ix[True][attribute]- record.ix[False][attribute])/record.ix[False][attribute])*100.00
+
+  
+
+def calcChange(res):
+  t = []
+  l = []
+  mb = []
+  for data in res['reconfigs']:
+    if 'THROUGHPUT' not in data:
+      continue
+    if len(data) < 2:
+      continue
+    throughputDrop = getChange(data,'THROUGHPUT')
+    t.append(throughputDrop*-1)
+    latencyIncrease = getChange(data, 'LATENCY')
+    l.append(latencyIncrease)
+    mb_pulled = data.ix[True]['KB_PULLED']/1024
+    mb.append(mb_pulled)
+    print ",%s,%s,%s" % (throughputDrop, latencyIncrease, mb_pulled)
+  fit = np.polyfit(mb,t,1)
+  fit_fn = np.poly1d(fit)
+
+  plot.plot(mb,t,'o', mb,fit_fn(mb),'--k')
+  plot.ylabel("Throughput % Increase During Reconfiguration")
+  plot.xlabel("TPC-C MB Reconfigured")
+  #plot.show()
+  #return (t,mb)
+
+
 def plotGraph(args):
 
     if args.ylabel != None:

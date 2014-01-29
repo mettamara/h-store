@@ -16,8 +16,10 @@ def plotTSD(files,filedir,var,ylabel,xlabel, ylim=None,xtrim=None, filename=None
   for f in files:
     _file = os.path.join(filedir,f[1])
     df = pandas.DataFrame.from_csv(_file,index_col=1)
-    if xtrim:
+    if isinstance(xtrim,int):
       df = df[:xtrim]
+    elif isinstance(xtrim,(list,tuple)):
+      df = df[xtrim[0]:xtrim[1]]
     #print var
     #print df[var].values
     data.append(df[var].values)
@@ -28,13 +30,19 @@ def plotTSD(files,filedir,var,ylabel,xlabel, ylim=None,xtrim=None, filename=None
     labels.append(f[0])
 
 
-  pylab.rc("axes", linewidth=2.0)
-  pylab.rc("lines", markeredgewidth=2.0)
+  #  params['figure.figsize'] = calcShortFigSize()
+  rcParams.update(params)
+  pylab.rc("axes", linewidth=1.0)
+  pylab.rc("lines", markeredgewidth=1.0)
 
+  f = plot.figure()
+  axarr =[]
+  axarr.append(plot.subplot(211))
+  axarr.append(plot.subplot(212))
 
-  f,axarr = plot.subplots(len(data), sharex=True, sharey=True)
-  plot.title("", fontsize=16)
-  plot.xlabel(xlabel,fontsize='16')
+  f,axarr = plot.subplots(len(data), sharex=True, sharey=True,)# figsize=calcShortFigSize())
+  plot.title("", )
+  plot.xlabel(xlabel,)
   #f.text(0.06, 0.5, 'common ylabel', ha='center', va='center', rotation='vertical', fontsize='18')
   
   pylab.ylim(ylim)
@@ -49,13 +57,22 @@ def plotTSD(files,filedir,var,ylabel,xlabel, ylim=None,xtrim=None, filename=None
     ax =axarr[j]
     if ylim:
       ax.set_ylim(ylim)
-    ax.plot(df.index, _d, label=name)
-    ax.set_ylabel(ylabel, fontsize='12')
-    ax.set_title(name)
+
+    if "Squall" not in name:
+      lcolor ="red"
+    else:
+      lcolor ="blue"
+    ax.plot(df.index, _d, label=name, lw=1.0, color= lcolor,)
+    plot.subplots_adjust(hspace=0.001)
+    ax.set_ylabel(ylabel,)
+    #ax.set_title(name)
+    ax.yaxis.set_major_locator(MaxNLocator(4))
+    ax.legend(loc=0)#,prop={'size':8})
+
     if len(r[r.RECONFIG.str.contains('TXN')]) == 1:
-      ax.axvline(r[r.RECONFIG.str.contains('TXN')].index[0], color=color, lw=1.5, linestyle="--",label=init_legend)
+      ax.axvline(r[r.RECONFIG.str.contains('TXN')].index[0], color=color, lw=1.0, linestyle="--",label=init_legend)
       if any(r.RECONFIG.str.contains('END')):
-          ax.axvline(r[r.RECONFIG.str.contains('END')].index[0], color=color, lw=1.5, linestyle=":",label=end_legend)
+          ax.axvline(r[r.RECONFIG.str.contains('END')].index[0], color=color, lw=1.0, linestyle=":",label=end_legend)
           end_legend = None
       else:
           LOG.error("*****************************************")
@@ -76,34 +93,75 @@ def plotTSD(files,filedir,var,ylabel,xlabel, ylim=None,xtrim=None, filename=None
   #for label in ax.xaxis.get_ticklabels():
     #label.set_rotation(0)
 
-  rcParams.update(params)
-  plot.tight_layout()
   
+  f.tight_layout()
+  print params
   if filename:
     plot.savefig(filename, format = 'pdf')
   else:
     plot.show()
 
 if __name__ == "__main__":
+  import sys
 
-  tpcc_files = [ 
-    ( "Stop and Copy TPC-C" , "tppc-s32-8-0min-NEW/out/stopcopy-tpcc-small/tpcc-08p-1-interval_res.csv" ),
-    ( "Squall TPC-C" ,   "tppc-s32-8-0min-NEW/out/reconfig-tpcc-small/tpcc-08p-1-interval_res.csv" ),
-#    ( "Stop and Copy TPC-C" , "tpcc-s32-8-0min-NEW/out/stopcopy-tpcc-small/tpcc-08p-sites1-interval_res.csv" ),
- #   ( "Squall TPC-C" ,        "tpcc-s32-8-0min-NEW/out/reconfig-tpcc-small/tpcc-08p-sites1-interval_res.csv" ),
+  
+  #contraction
+  tpcc = [
+    ( "Stop and Copy TPC-C" , "stopcopy-2b/tpcc-08p-tpc4ContractScale0.2-interval_res.csv"), 
+    ( "Squall TPC-C" ,        "reconfig-2b/tpcc-08p-tpc4ContractScale0.2-interval_res.csv"), 
   ] 
   
-  filedir = "/home/aelmore/out"#/home/aelmore/out/small-tpcc-0minimal/out "
+  filedir = "/home/aelmore/out/tcontract16-scale02/out"
   if not os.path.isdir(filedir):
     raise Exception("Not a directory")
   var = "LATENCY"
   ylabel = "Latency (ms)"
   xlabel = "Elapsed Time (seconds)"
-  #plotTSD(ycsb_files,filedir,var, ylabel,xlabel, [0,50],180, "tpccTSDmeanLat-8to7partitions-32w")
+  plotTSD(tpcc,filedir,var, ylabel,xlabel, [0,2000],(20,180), "tpcTSDmeanLat-8to4partitions-16w-scale02.pdf")
   
   var = "THROUGHPUT"
   ylabel = "TPS"
   xlabel = "Elapsed Time (seconds)"
-  plotTSD(tpcc_files,filedir,var, ylabel,xlabel, [0,15000],180, "tpccTSDmeanTPS-8to7partitions-32wh" )  
+  plotTSD(tpcc,filedir,var, ylabel,xlabel, [0,4000],(20,180), "tpcTSDmeanTPS-8to4partitions-16w-scale02.pdf" )  
 
+  #Expansion
 
+  tpcc = [
+    ( "Stop and Copy TPC-C" , "stopcopy-2b/tpcc-08p-tpc4to8expand-scl02-interval_res.csv"), 
+    ( "Squall TPC-C" ,        "reconfig-2b/tpcc-08p-tpc4to8expand-scl02-interval_res.csv"), 
+  ] 
+  
+  filedir = "/home/aelmore/out/tpcc-expand/out"
+
+  if not os.path.isdir(filedir):
+    raise Exception("Not a directory")
+  var = "LATENCY"
+  ylabel = "Latency (ms)"
+  xlabel = "Elapsed Time (seconds)"
+  plotTSD(tpcc,filedir,var, ylabel,xlabel, [0,3500],(20,180), "tpcTSDmeanLat-4to8partitions-16w-scale02.pdf")
+  
+  var = "THROUGHPUT"
+  ylabel = "TPS"
+  xlabel = "Elapsed Time (seconds)"
+  plotTSD(tpcc,filedir,var, ylabel,xlabel, [0,4000],(20,180), "tpcTSDmeanTPS-4to8partitions-16w-scale02.pdf" )  
+
+  #Expansion 6->8
+
+  tpcc = [
+    ( "Stop and Copy TPC-C" , "stopcopy-2b/tpcc-08p-tpc6to8expand-scl02-interval_res.csv"), 
+    ( "Squall TPC-C" ,        "reconfig-2b/tpcc-08p-tpc6to8expand-scl02-interval_res.csv"), 
+  ] 
+  
+  filedir = "/home/aelmore/out/tpcc-expand-part/out"
+
+  if not os.path.isdir(filedir):
+    raise Exception("Not a directory")
+  var = "LATENCY"
+  ylabel = "Latency (ms)"
+  xlabel = "Elapsed Time (seconds)"
+  plotTSD(tpcc,filedir,var, ylabel,xlabel, [0,3500],(20,180), "tpcTSDmeanLat-6to8partitions-16w-scale02.pdf")
+  
+  var = "THROUGHPUT"
+  ylabel = "TPS"
+  xlabel = "Elapsed Time (seconds)"
+  plotTSD(tpcc,filedir,var, ylabel,xlabel, [0,4000],(20,180), "tpcTSDmeanTPS-6to8partitions-16w-scale02.pdf" )  
