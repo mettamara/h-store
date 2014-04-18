@@ -1382,6 +1382,12 @@ public class ReconfigurationCoordinator implements Shutdownable {
      */
     public int getPartitionId(int previousPartition, int expectedPartition, CatalogType catalogItem, Object value) {
         //TODO add a fast lookup with no exception
+        
+        if (PROBABILISTIC_REDIRECT){
+            
+        }
+            
+        
         if (executorMap.containsKey(expectedPartition)){
             //check with destination if we have it
             try{
