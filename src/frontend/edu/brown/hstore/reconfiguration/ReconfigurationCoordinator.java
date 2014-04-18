@@ -89,6 +89,7 @@ public class ReconfigurationCoordinator implements Shutdownable {
     
     //Force reconfig look ups to go to destination
     public static final boolean FORCE_DESTINATION = false;
+    private static final boolean PROBABILISTIC_REDIRECT = true;
     
     // Cached list of local executors
     private List<PartitionExecutor> local_executors;
@@ -1384,7 +1385,11 @@ public class ReconfigurationCoordinator implements Shutdownable {
         //TODO add a fast lookup with no exception
         
         if (PROBABILISTIC_REDIRECT){
-            
+           if (Math.random() < 0.05){
+               return expectedPartition;
+           } else {
+               return previousPartition;
+           }
         }
             
         
