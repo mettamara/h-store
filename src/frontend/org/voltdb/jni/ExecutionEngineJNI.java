@@ -522,7 +522,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         int results;
         try {
             long tupleBytes = MemoryEstimator.estimateTupleSize(targetTable);
-            int tupleExtractLimit = (int)(extractChunkSizeBytes/tupleBytes);
+            int tupleExtractLimit = (int)(extractChunkSizeBytes)/1024;///tupleBytes);
             results = deserializer.readInt();
             if (trace.val) LOG.trace("Results :"+results);
             final int errorCode = nativeExtractTable(this.pointer, tableId, serialized_table, txnId, lastCommittedTxnId, undoToken, requestToken, tupleExtractLimit);

@@ -92,13 +92,13 @@ void MigrationManager::init(PersistentTable *table) {
     m_partitionKeySchema = createPartitionKeySchema(static_cast<int>(m_partitionColumns.size()));
     
     if(m_partitionIndex == NULL) {
-      VOLT_DEBUG("partitionColumn is not indexed. partitionColumn[0]: %d",m_partitionColumns[0]);
+      VOLT_INFO("partitionColumn is not indexed. partitionColumn[0]: %d",m_partitionColumns[0]);
       //TODO ae what do we do when we have no index for the partition colum?
       m_partitionColumnsIndexed = false;
       m_exactMatch = false;
       m_matchingIndexColsSchema = NULL;
     } else {
-      VOLT_DEBUG("partitionColumn is indexed. partitionColumn[0]: %d",m_partitionColumns[0]);
+      VOLT_INFO("partitionColumn is indexed. partitionColumn[0]: %d",m_partitionColumns[0]);
       m_partitionColumnsIndexed = true;
       m_exactMatch = (m_matchingIndexCols == m_partitionColumns.size());
       m_matchingIndexColsSchema = createPartitionKeySchema(m_matchingIndexCols);
@@ -193,7 +193,7 @@ bool MigrationManager::inRange(const TableTuple& tuple, const RangeMap& rangeMap
 bool MigrationManager::extractTuple(TableTuple& tuple) {
   //Have we reached our datalimit and found another tuple
   if (m_dataLimitReach == true){
-    VOLT_DEBUG("more tuples with limit");
+    VOLT_INFO("more tuples with limit");
     return true;
   }
 
@@ -203,9 +203,10 @@ bool MigrationManager::extractTuple(TableTuple& tuple) {
   }
   
   m_table->deleteTuple(tuple, true);
+  //tuple.setMigratedTrue();
   //Count if we have taken the max tuples
   if (++m_tuplesExtracted >= m_extractTupleLimit) {
-    VOLT_DEBUG("tuple limit reached: %d", m_tuplesExtracted);
+    VOLT_INFO("tuple limit reached: %d", m_tuplesExtracted);
     m_dataLimitReach = true;
   }
 
@@ -296,7 +297,7 @@ void MigrationManager::getRangeMap(RangeMap& rangeMap, TableIterator& inputItera
       rangeMap.insert(std::make_pair(maxKeys, minKeys)); 
     }
 
-    VOLT_DEBUG("ExtractRange %s %s - %s ", m_table->name().c_str(),minKeys.debugNoHeader().c_str(),maxKeys.debugNoHeader().c_str() );
+    VOLT_INFO("ExtractRange %s %s - %s ", m_table->name().c_str(),minKeys.debugNoHeader().c_str(),maxKeys.debugNoHeader().c_str() );
   }
 }
 
@@ -332,7 +333,7 @@ Table* MigrationManager::extractRanges(PersistentTable *table, TableIterator& in
     return NULL; // failed to insert into output table
   } 
   
-  VOLT_DEBUG("Tuples extracted: %d, Output Table %s",m_tuplesExtracted, m_outputTable->debug().c_str());
+  VOLT_INFO("Tuples extracted: %d, Output Table %ld",m_tuplesExtracted, (long)m_outputTable->activeTupleCount());
   m_extractedTables[requestToken] = m_outputTable;
   m_extractedTableNames[requestToken] = m_table->name();
 
@@ -360,13 +361,13 @@ TableIndex* MigrationManager::getPartitionColumnsIndex() {
     for (int i = 0; i < m_table->indexCount(); ++i) {
         TableIndex *index = tableIndexes[i];
         
-        VOLT_DEBUG("Index %s ", index->debug().c_str());
+        VOLT_INFO("Index %s ", index->debug().c_str());
 
 	if(index->getScheme().type == BALANCED_TREE_INDEX) { // tree index
 	  for(int i = 0; i < index->getColumnIndices().size() && i < m_partitionColumns.size(); i++) {
 	     if (index->getColumnIndices()[i] == m_partitionColumns[i]){
 	       if(i >= bestMatchingIndexCols) {
-		 VOLT_DEBUG("Index matches");
+		 VOLT_INFO("Index matches");
 		 bestMatchingIndexCols = i+1;
 		 bestIndex = index;
 	       }
@@ -381,7 +382,7 @@ TableIndex* MigrationManager::getPartitionColumnsIndex() {
 	  // then we know we'll always have the value for every one of the partitionColumns, so 
 	  // the column count doesn't have to be 1
 	  if (bestIndex == NULL && index->getColumnIndices()[0] == m_partitionColumns[0]){
-	    VOLT_DEBUG("Index matches");
+	    VOLT_INFO("Index matches");
 	    bestMatchingIndexCols = 1;
 	    bestIndex = index;
 	  }	  
@@ -401,11 +402,11 @@ TableIndex* MigrationManager::getPartitionColumnsIndex() {
 
 bool MigrationManager::confirmExtractDelete(int32_t requestTokenId) {
     if(m_extractedTables.find(requestTokenId) == m_extractedTables.end()){
-        VOLT_DEBUG("confirmExtractDelte requestTokenId was not found");
+        VOLT_INFO("confirmExtractDelte requestTokenId was not found");
         return false;
     }
     else {
-        VOLT_DEBUG("confirmExtractDelete for token %d", requestTokenId);
+        VOLT_INFO("confirmExtractDelete for token %d", requestTokenId);
         Table* migratedData = m_extractedTables[requestTokenId];
         migratedData->deleteAllTuples(true);
         delete migratedData;        

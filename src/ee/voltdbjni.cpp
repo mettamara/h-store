@@ -467,6 +467,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExtractTable(JNIEnv *env,
             ReferenceSerializeInput serialize_in(bytes, length);
             int requestToken = request_token;
             int result = engine->extractTable( table_id, serialize_in, txnId, lastCommittedTxnId, requestToken, extractTupleLimit );
+            VOLT_INFO("Extract table returned %d", result);
             return result;
 	    //if (results == org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS)
               //      return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;

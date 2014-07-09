@@ -114,7 +114,7 @@ public class TestReconfigurationEEPerformance extends BaseTestCase {
     }
     
     @Test
-    public void testNewOrder() throws Exception {
+    public void tesxtNewOrder() throws Exception {
         long recs = 100000;
         int warehouses = 5;
         for (int i=0; i < warehouses; i++){
@@ -165,21 +165,21 @@ public class TestReconfigurationEEPerformance extends BaseTestCase {
     
     @Test
     public void testOrderLine() throws Exception {
-        long recs = 100000;
-        int warehouses = 5;
+        long recs = 300000;
+        int warehouses = 1;
         for (int i=0; i < warehouses; i++){
             LOG.info("Loading order lines: " + recs);
             loadTPCCData(recs, orderline, this.ordline_ind, i);
         }
 
-        int EXTRACT_LIMIT = 200000;
+        int EXTRACT_LIMIT = 30000*1024;
         ((ExecutionEngineJNI)(this.ee)).DEFAULT_EXTRACT_LIMIT_BYTES = EXTRACT_LIMIT;
 
 
         ReconfigurationRange range; 
         VoltTable extractTable;
         
-        int wid =2;
+        int wid =0;
         range = ReconfigurationUtil.getReconfigurationRange(orderline, new Long[][]{{ new Long(wid) }}, new Long[][]{{ new Long(wid+1) }}, 1, 2);
         extractTable = ReconfigurationUtil.getExtractVoltTable(range);   
         
@@ -199,6 +199,11 @@ public class TestReconfigurationEEPerformance extends BaseTestCase {
             end = System.currentTimeMillis();
             LOG.info(String.format("Rows:%s Size:%s Time taken: %s",resTable.getFirst().getRowCount(),(resTable.getFirst().getRowCount()*resTable.getFirst().getRowSize()),(end-start)));
             resCount += resTable.getFirst().getRowCount();
+            if (resTable.getFirst().getRowCount() != (EXTRACT_LIMIT/1024)){
+                LOG.error("****************************************");
+                LOG.error("ROWS: " + resTable.getFirst().getRowCount());
+                LOG.error("****************************************");
+            }
             //LOG.info("Total RowCount :" +resCount);
             
             chunks++;
@@ -206,6 +211,7 @@ public class TestReconfigurationEEPerformance extends BaseTestCase {
             if (count %10 == 0){
                 //loadTPCCData((long)(Math.random()*30), orderline, this.ordline_ind, wid);
             }
+            LOG.info("  ");
         } while (resTable != null && resTable.getSecond());
         System.out.println("Counts : " + count);
         assertEquals(recs, resCount);
