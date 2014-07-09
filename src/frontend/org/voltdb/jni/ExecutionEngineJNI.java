@@ -524,13 +524,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             long tupleBytes = MemoryEstimator.estimateTupleSize(targetTable);
             int tupleExtractLimit = (int)(extractChunkSizeBytes)/1024;///tupleBytes);
             results = deserializer.readInt();
-            if (trace.val) LOG.trace("Results :"+results);
+            LOG.info("Results :"+results);
             final int errorCode = nativeExtractTable(this.pointer, tableId, serialized_table, txnId, lastCommittedTxnId, undoToken, requestToken, tupleExtractLimit);
             if (debug.val) LOG.debug("Done with extract");
             checkErrorCode(errorCode);
             boolean moreData = checkIfMoreDataOrError(errorCode);
-            
-            return new Pair<VoltTable, Boolean>(deserializer.readObject(VoltTable.class), moreData, false);
+            VoltTable res = deserializer.readObject(VoltTable.class);
+            LOG.info(String.format("Des %s",deserializer.getPosition()));
+            return new Pair<VoltTable, Boolean>(res , moreData, false);
         } catch (IOException e) {
             LOG.error("Failed to deserialze result dependencies" + e);
             throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);

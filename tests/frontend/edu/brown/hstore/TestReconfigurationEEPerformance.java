@@ -201,7 +201,7 @@ public class TestReconfigurationEEPerformance extends BaseTestCase {
             resCount += resTable.getFirst().getRowCount();
             if (resTable.getFirst().getRowCount() != (EXTRACT_LIMIT/1024)){
                 LOG.error("****************************************");
-                LOG.error("ROWS: " + resTable.getFirst().getRowCount());
+                LOG.error("* ERROR ROWS: " + resTable.getFirst().getRowCount());
                 LOG.error("****************************************");
             }
             //LOG.info("Total RowCount :" +resCount);
@@ -211,7 +211,7 @@ public class TestReconfigurationEEPerformance extends BaseTestCase {
             if (count %10 == 0){
                 //loadTPCCData((long)(Math.random()*30), orderline, this.ordline_ind, wid);
             }
-            LOG.info("  ");
+            LOG.info(" \n ");
         } while (resTable != null && resTable.getSecond());
         System.out.println("Counts : " + count);
         assertEquals(recs, resCount);
