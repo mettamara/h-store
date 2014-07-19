@@ -67,6 +67,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Random;
 
 import org.apache.commons.lang.NotImplementedException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -1169,7 +1170,8 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                     if (trace.val)
                         LOG.trace("Next Work: " + nextWork);
                     if (showPostReconfig && (loopCount++ %1 )==0){
-                        LOG.info("post Squall : " + nextWork+ " -- lockQueueSize " + this.lockQueue.size() + " -- workQueueSize:"+this.work_queue.size());                        
+                        LOG.info("post Squall : " + nextWork+ " -- lockQueueSize " + this.lockQueue.size() + " -- workQueueSize:"+this.work_queue.size() +
+                                " dtxn:"+ this.currentDtxn);                        
                     }
                     
                     if (hstore_conf.site.exec_profiling) {
@@ -1211,7 +1213,8 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                         nextWork = UTIL_WORK_MSG;
                     }
                     if (showPostReconfig && (loopCount++ %500 )==0){
-                        LOG.info("post Squall utilityWork gave: " + nextWork + " -- lockQueueSize " + this.lockQueue.size()+ " -- workQueueSize:"+this.work_queue.size());                        
+                        LOG.info("post Squall utilityWork gave: " + nextWork + " -- lockQueueSize " + this.lockQueue.size()+ " -- workQueueSize:"+this.work_queue.size() +
+                                " dtxn:"+ this.currentDtxn + " blocked: "+ this.currentBlockedTxns);                        
                     }
                 }
             } // WHILE
@@ -2989,9 +2992,13 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
             }
         } finally {
             if (error != null) {
+                try{
                 // error.printStackTrace();
                 LOG.warn(String.format("%s - Unexpected %s on partition %d",
                          ts, error.getClass().getSimpleName(), this.partitionId)); // (debug.val ? error : null));
+                } catch (Exception e){
+                    LOG.error("Exception on debug :", e);
+                }
             }
             // Success, but without any results???
             if (result == null && status == Status.OK) {
@@ -3766,18 +3773,25 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                                                int input_depIds[],
                                                Map<Integer, List<VoltTable>> input_deps) {
         assert(this.ee != null) : "The EE object is null. This is bad!";
-
-        if (this.inReconfiguration) {
-            if(reconfiguration_coordinator.isLive_pull()) {
-            	checkReconfigurationTracking(fragmentIds, parameterSets, ts.isPredictSinglePartition());
-            } else {
-            	checkReconfigurationTrackingAsyncPulls(fragmentIds, parameterSets, ts.isPredictSinglePartition());
-            }
-        }
-
-        
         Long txn_id = ts.getTransactionId();
 
+        try{
+            if (this.inReconfiguration) {
+                if(reconfiguration_coordinator.isLive_pull()) {
+                	checkReconfigurationTracking(fragmentIds, parameterSets, ts.isPredictSinglePartition(), ts);
+                } else {
+                	checkReconfigurationTrackingAsyncPulls(fragmentIds, parameterSets, ts.isPredictSinglePartition());
+                }
+            }
+        } catch (MispredictionException me){
+            LOG.info("("+txn_id+") Check through MPE : "+ me.getMessage());
+            throw me;
+        } catch (Exception e){
+            LOG.info("("+txn_id+") Check Tracking Exception: ", e);
+        } 
+
+        
+        
         // *********************************** DEBUG ***********************************
         if (debug.val) {
             StringBuilder sb = new StringBuilder();
@@ -3959,7 +3973,7 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
     }
     
     
-    private void checkReconfigurationTracking(long fragmentIds[], ParameterSet parameterSets[], boolean predict_single_partition) {
+    private void checkReconfigurationTracking(long fragmentIds[], ParameterSet parameterSets[], boolean predict_single_partition, AbstractTransaction txn) {
         if (debug.val)
             LOG.debug("check reconfigurationTracking");
         if (this.reconfiguration_tracker == null) {
@@ -3975,7 +3989,7 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         Set<ReconfigurationRange> pullRequestsNeeded = new TreeSet<>();
         Set<ReconfigurationRange> restartsNeeded = new TreeSet<>();
         Set<Integer> partitionsForRestart = new HashSet<>();
-      
+        StringBuilder sb2 = new StringBuilder();
         //this.reconfiguration_coordinator.profilers[this.partitionId].pe_check_txn_time.start();
         for (int i = 0; i < fragmentIds.length; i++) {
             // Calls andy's methods for calculaitng the offsets
@@ -3998,6 +4012,10 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                     	    //LOG.info(String.format("Restarting due to key not ownded CatalogObj:%s Parameter:%s  KeyOwned:%s d:%s",offsetPair.getFirst(), 
                     	      //      parametersToCheck.toString(), keyOwned, currentDXN));
                     		partitionsForRestart.addAll(this.reconfiguration_tracker.getAllPartitionIds(offsetPair.getFirst(), parametersToCheck));
+                    		sb2.append(" missing:");
+                    		sb2.append(StringUtils.join(offsetPair.getFirst().toArray()));
+                    		sb2.append("-");
+                    		sb2.append(StringUtils.join(parametersToCheck.toArray()));
                     	} catch (Exception e) {
                     		LOG.error("Error while finding partitions for restart: " + e);
                     	}
@@ -4013,7 +4031,7 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                     } else if (rex.exceptionType == ExceptionTypes.TUPLES_NOT_MIGRATED || rex.exceptionType == ExceptionTypes.BOTH) {
                         // not yet migrated
                         if (ReconfigurationCoordinator.STATIC_PULL_FILTER){
-                            rex.dataNotYetMigrated = staticFilter(rex.dataNotYetMigrated, currentTxn.getProcedure().getName());
+                            rex.dataNotYetMigrated = staticFilter(rex.dataNotYetMigrated, txn.getProcedure().getName());
                         }
                         if (rex.dataNotYetMigrated.isEmpty()){
                             LOG.info("All needed data for a transaction has been filtered");
@@ -4026,6 +4044,9 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
 
                 }
             }
+        }
+        if (partitionsForRestart.size()> 0){
+            LOG.info(String.format(" Restating for %s  (%s) txn:%s dtxn:%s",sb2.toString(),txn.getTransactionId(), this.currentTxnId, this.currentDtxn));
         }
         //this.reconfiguration_coordinator.profilers[this.partitionId].pe_check_txn_time.stopIfStarted();
         // Blocking here
@@ -4047,7 +4068,7 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                 if (this.reconfiguration_coordinator == null){
                     throw new RuntimeException("Null RC");
                 }
-                this.reconfiguration_coordinator.pullRanges(pullID, this.currentTxnId, this.partitionId, pullRequestsNeeded, pullBlockSemaphore);
+                this.reconfiguration_coordinator.pullRanges(pullID, txn.getTransactionId(), this.partitionId, pullRequestsNeeded, pullBlockSemaphore);
                 if (debug.val) LOG.debug("Blocking on ranges " + pullRequestsNeeded.size());
                 try {
 
@@ -4070,7 +4091,7 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                     String logmsg = String.format(
                             "PULLID=%s, livePullReceiveTimeMS=%s, livePullReceiveAndLoadTimeMS=%s, liveRowsPulled=%s,livePullDataReceivedKB=%s, livePulls=%s, txn=%s, partitionId=%s, ranges=%s\n",
                             pullID, (dataReceived-blockStartTime)/ 1000000, (dataReceivedAndProcessed-blockStartTime)/1000000,currentLiveRows, dataReceivedKB, pullRequestsNeeded.size(),
-                            currentTxn.getProcedure().getName(),partitionId, pullRequestsNeeded);
+                            txn.getProcedure().getName(),partitionId, pullRequestsNeeded);
                     //reconfiguration_stats.addMessage("REPORT_SINGLE_PULL, "+logmsg);
                     currentLiveRows = 0;
                     FileUtil.appendEventToFile("LIVE_PULL_COMPLETED, "+logmsg); 
@@ -4091,21 +4112,31 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                 }
             } else {
                 LOG.info("Issueing non blocking pull for ranges : " + pullRequestsNeeded.size());
-                this.reconfiguration_coordinator.pullRangesNonBlocking(getNextRequestToken(), this.currentTxnId, this.partitionId, pullRequestsNeeded);
+                this.reconfiguration_coordinator.pullRangesNonBlocking(getNextRequestToken(), txn.getTransactionId(), this.partitionId, pullRequestsNeeded);
             }
         }
         if (restartsNeeded.size() > 0 || partitionsForRestart.size() > 0) {
             Histogram<Integer> partitionHistogram = new FastIntHistogram();
-            partitionHistogram.put(this.currentTxn.getPredictTouchedPartitions(), 1);
+            partitionHistogram.put(txn.getPredictTouchedPartitions(), 1);
             StringBuilder sb = new StringBuilder("Restarts for:");
             for (ReconfigurationRange range : restartsNeeded) {
-                sb.append(range.toString() +", ");
-                partitionHistogram.put(range.getNewPartition());
+                if(range != null){
+                    partitionHistogram.put(range.getNewPartition());
+                    try{
+                    sb.append(range.toString() +", ");
+                    } catch (Exception ex){
+                        LOG.error("caught ex", ex);
+                    }
+                }
+                else {
+                    sb.append(" NULL Range!, ");
+                }   
             }
-            LOG.info("Restarts needed due to migrated data : " + restartsNeeded.size() + ", " + sb.toString());
+            LOG.info("("+ txn.getTransactionId()+") Restarts needed due to migrated data : " + restartsNeeded.size() + ", " + sb.toString() + " | ");
             
             partitionHistogram.put(partitionsForRestart);
-            throw new MispredictionException(this.currentTxnId, partitionHistogram);
+            
+            throw new MispredictionException(txn.getTransactionId(), partitionHistogram);
 
         }
 

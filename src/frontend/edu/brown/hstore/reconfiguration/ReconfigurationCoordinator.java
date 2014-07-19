@@ -1359,7 +1359,12 @@ public class ReconfigurationCoordinator implements Shutdownable {
     private final RpcCallback<MultiPullReplyResponse> multiPullReplyResponseCallback = new RpcCallback<MultiPullReplyResponse>() {
         @Override
         public void run(MultiPullReplyResponse msg) {
-        	LOG.info(String.format("Callback for multi pull ID:%s chunkID:%s reply for partition %s isAsync:%s ", msg.getPullIdentifier(), msg.getChunkId(), msg.getOldPartition(),msg.getIsAsync()));
+            try{
+                LOG.info(String.format("Callback for multi pull ID:%s chunkID:%s reply for partition %s isAsync:%s ", msg.getPullIdentifier(), msg.getChunkId(), msg.getOldPartition(),msg.getIsAsync()));
+            } catch(Exception e){
+                LOG.info("Exception on printing callback",e);
+            }
+            
         }
     };
 

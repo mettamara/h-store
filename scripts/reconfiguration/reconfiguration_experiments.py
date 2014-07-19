@@ -157,8 +157,12 @@ def updateReconfigurationExperimentEnv(fabric, args, benchmark, partitions ):
         fabric.env["benchmark.loadthread_per_warehouse"] = False
         fabric.env["benchmark.loadthreads"] = max(16, partitions)        
         fabric.env["partitionplan"]="tpcc-plan-fine-grained.pplan" #"tpcc-plan.pplan"
-        fabric.env["hstore.partitions_per_site"]=3
-        fabric.env["hstore.sites_per_host"]=1
+        fabric.env["hstore.partitions_per_site"]=2
+        #fabric.env["site.status_enable"]=True
+        #fabric.env["site.status_interval"]=5000
+        #fabric.env["site.status_exec_info"]=False
+        #fabric.env["site.status_thread_info"]=True
+        fabric.env["hstore.sites_per_host"]=2
 
 
     if 'reconfig-10b' in  args['exp_type'] or 'stopcopy-10b' in args['exp_type']:
