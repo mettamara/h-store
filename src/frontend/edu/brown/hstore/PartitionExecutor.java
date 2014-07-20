@@ -1133,6 +1133,12 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                         // the queue
                         // for more work.
                         else {
+                            if (inReconfiguration){
+                                LOG.info(String.format("(%s) DTXN set while in squall: %s", this.partitionId,nextTxn.toString()));
+                            }
+                            if (showPostReconfig){
+                                LOG.info(String.format("(%s) DTXN set in post-squall: %s", this.partitionId,nextTxn.toString()));                                
+                            }
                             this.setCurrentDtxn(nextTxn);
                         }
                     }
@@ -1171,7 +1177,11 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                         LOG.trace("Next Work: " + nextWork);
                     if (showPostReconfig && (loopCount++ %1 )==0){
                         LOG.info("post Squall : " + nextWork+ " -- lockQueueSize " + this.lockQueue.size() + " -- workQueueSize:"+this.work_queue.size() +
-                                " dtxn:"+ this.currentDtxn);                        
+                                " dtxn:"+ this.currentDtxn );
+                        if( nextWork instanceof WorkFragmentMessage){
+                            
+                        }
+                       
                     }
                     
                     if (hstore_conf.site.exec_profiling) {
@@ -1214,7 +1224,8 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                     }
                     if (showPostReconfig && (loopCount++ %500 )==0){
                         LOG.info("post Squall utilityWork gave: " + nextWork + " -- lockQueueSize " + this.lockQueue.size()+ " -- workQueueSize:"+this.work_queue.size() +
-                                " dtxn:"+ this.currentDtxn + " blocked: "+ this.currentBlockedTxns);                        
+                                " dtxn:"+ this.currentDtxn + " blocked: "+ this.currentBlockedTxns);
+                        if(this.currentDtxn!=null) LOG.info(this.currentDtxn.toString());
                     }
                 }
             } // WHILE
@@ -1765,14 +1776,14 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
             // There is no current DTXN, so that means its us!
             if (this.currentDtxn == null) {
                 this.setCurrentDtxn(ts);
-                if (debug.val)
-                    LOG.debug(String.format("Marking %s as current DTXN on partition %d [nextMode=%s]", ts, this.partitionId, newMode));
+                if (showPostReconfig)
+                    LOG.info(String.format("sQ Marking %s as current DTXN on partition %d [nextMode=%s] dest:%s", ts, this.partitionId, newMode, fragment.getPartitionId()));
             }
             // There is a current DTXN but it's not us!
             // That means we need to block ourselves until it finishes
             else if (this.currentDtxn != ts) {
-                if (debug.val)
-                    LOG.debug(String.format("%s - Blocking on partition %d until current Dtxn %s finishes", ts, this.partitionId, this.currentDtxn));
+                if (showPostReconfig)
+                    LOG.info(String.format("sQ %s - Blocking on partition %d until current Dtxn %s finishes dest:%s", ts, this.partitionId, this.currentDtxn, fragment.getPartitionId()));
                 this.blockTransaction(work);
                 return;
             }
@@ -2305,8 +2316,8 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         } else {
             this.specExecIgnoreCurrent = true;
         }
-        if (debug.val) {
-            LOG.debug(String.format("Set %s as the current DTXN for partition %d [specExecIgnore=%s, previous=%s]",
+        if (showPostReconfig) {
+            LOG.info(String.format("Set %s as the current DTXN for partition %d [specExecIgnore=%s, previous=%s]",
                       ts, this.partitionId, this.specExecIgnoreCurrent, this.lastDtxnDebug));
             this.lastDtxnDebug = this.currentDtxn.toString();
         }
@@ -2791,10 +2802,10 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
             if (status != Status.OK && ts.isExecReadOnly(this.partitionId) == false) {
                 this.setExecutionMode(ts, ExecutionMode.DISABLED);
                 int blocked = this.work_queue.drainTo(this.currentBlockedTxns);
-                if (debug.val) {
-                    if (trace.val && blocked > 0)
-                        LOG.trace(String.format("Blocking %d transactions at partition %d because ExecutionMode is now %s", blocked, this.partitionId, this.currentExecMode));
-                    LOG.debug(String.format("Disabling execution on partition %d because speculative %s aborted", this.partitionId, ts));
+                if(showPostReconfig) {
+                    if (blocked > 0)
+                        LOG.info(String.format("Blocking %d transactions at partition %d because ExecutionMode is now %s", blocked, this.partitionId, this.currentExecMode));
+                    LOG.info(String.format("Disabling execution on partition %d because speculative %s aborted", this.partitionId, ts));
                 }
             }
             if (trace.val)
@@ -5258,6 +5269,9 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                 if (num_localPartition > 0) {
                     if (trace.val)
                         LOG.trace(String.format("%s - Executing %d WorkFragments on local partition", ts, num_localPartition));
+                    if (showPostReconfig)
+                        LOG.info(String.format("%s - Executing %d WorkFragments on local partition", ts, num_localPartition));
+                    
                     for (WorkFragment.Builder fragmentBuilder : this.tmp_localWorkFragmentBuilders) {
                         this.processWorkFragment(ts, fragmentBuilder.build(), batchParams);
                     } // FOR
@@ -6173,9 +6187,15 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
     }
     
     private void blockTransaction(InternalTxnMessage work) {
-        if (debug.val)
-            LOG.debug(String.format("%s - Adding %s work to blocked queue", work.getTransaction(), work.getClass().getSimpleName()));
+        if (showPostReconfig)
+            LOG.info(String.format("%s - Adding %s work to blocked queue", work.getTransaction(), work.getClass().getSimpleName()));
         this.currentBlockedTxns.add(work);
+        assert(this.currentDtxn != null) :
+            String.format("Trying to block %s for %s at partition %d but the current dtxn is null",
+            work, work.getTransaction(), this.partitionId);
+            assert(this.currentDtxn != work.getTransaction()) :
+            String.format("Trying to block %s for %s at partition %d but it is the current dtxn",
+            work, work.getTransaction(), this.partitionId);
     }
 
     private void blockTransaction(LocalTransaction ts) {
@@ -6585,7 +6605,8 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         this.showPostReconfig  = true;
         this.loopCount = 0;
         if (this.currentDtxn != null){
-            LOG.info("CurrentDTXN in clean up " + this.currentDtxn.toString());
+            LOG.info("Cur"
+                    + "rentDTXN in clean up " + this.currentDtxn.toString());
         }
         if (this.currentTxn != null){
             LOG.info("CurrentTXN in clean up " + this.currentTxn.toString());
