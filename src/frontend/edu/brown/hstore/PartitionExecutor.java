@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.BlockingDeque;
@@ -64,10 +65,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.Random;
 
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -84,11 +85,9 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Host;
 import org.voltdb.catalog.Partition;
@@ -120,7 +119,6 @@ import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.Pair;
-import org.voltdb.utils.VoltTableComparator;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcCallback;
@@ -1178,9 +1176,11 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                     if (showPostReconfig && (loopCount++ %1 )==0){
                         LOG.info("post Squall : " + nextWork+ " -- lockQueueSize " + this.lockQueue.size() + " -- workQueueSize:"+this.work_queue.size() +
                                 " dtxn:"+ this.currentDtxn );
-                        if( nextWork instanceof WorkFragmentMessage){
-                            
-                        }
+//                        if( nextWork instanceof WorkFragmentMessage){
+//                            WorkFragment fragment = ((WorkFragmentMessage) nextWork).getFragment();
+//                            LOG.info( fragment.getPartitionId() + " frag : " + fragment.toString() + " hash:"+ fragment.hashCode());
+//
+//                        }
                        
                     }
                     
@@ -2396,8 +2396,8 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         boolean success = this.work_queue.offer(work); // , true);
         assert (success) : String.format("Failed to queue %s at partition %d for %s", work, this.partitionId, ts);
         ts.markQueuedWork(this.partitionId);
-        if (debug.val)
-            LOG.debug(String.format("%s - Added %s to partition %d " + "work queue [size=%d]", ts, work.getClass().getSimpleName(), this.partitionId, this.work_queue.size()));
+        if (showPostReconfig)
+            LOG.info(String.format("%s - Added %s to partition %d " + "work queue [size=%d]", ts, work.getClass().getSimpleName(), this.partitionId, this.work_queue.size()));
         if (hstore_conf.site.specexec_enable)
             this.specExecScheduler.interruptSearch(work);
     }
@@ -2429,8 +2429,8 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         PrepareTxnMessage work = new PrepareTxnMessage(ts, callback);
         boolean success = this.work_queue.offer(work);
         assert (success) : String.format("Failed to queue %s at partition %d for %s", work, this.partitionId, ts);
-        if (debug.val)
-            LOG.debug(String.format("%s - Added %s to partition %d " + "work queue [size=%d]", ts, work.getClass().getSimpleName(), this.partitionId, this.work_queue.size()));
+        if (showPostReconfig)
+            LOG.info(String.format("%s - Added %s to partition %d " + "work queue [size=%d]", ts, work.getClass().getSimpleName(), this.partitionId, this.work_queue.size()));
         // if (hstore_conf.site.specexec_enable)
         // this.specExecScheduler.interruptSearch();
     }
@@ -2447,8 +2447,8 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         FinishTxnMessage work = ts.getFinishTxnMessage(status);
         boolean success = this.work_queue.offer(work); // , true);
         assert (success) : String.format("Failed to queue %s at partition %d for %s", work, this.partitionId, ts);
-        if (debug.val)
-            LOG.debug(String.format("%s - Added %s to partition %d " + "work queue [size=%d]", ts, work.getClass().getSimpleName(), this.partitionId, this.work_queue.size()));
+        if (showPostReconfig)
+            LOG.info(String.format("%s - Added %s to partition %d " + "work queue [size=%d]", ts, work.getClass().getSimpleName(), this.partitionId, this.work_queue.size()));
         // if (success) this.specExecScheduler.haltSearch();
     }
 
@@ -2805,7 +2805,7 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                 if(showPostReconfig) {
                     if (blocked > 0)
                         LOG.info(String.format("Blocking %d transactions at partition %d because ExecutionMode is now %s", blocked, this.partitionId, this.currentExecMode));
-                    LOG.info(String.format("Disabling execution on partition %d because speculative %s aborted", this.partitionId, ts));
+                    LOG.info(String.format("Disabling execution on partition %d because speculative %s aborted. status: %s", this.partitionId, ts, status));
                 }
             }
             if (trace.val)
@@ -3787,7 +3787,7 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         Long txn_id = ts.getTransactionId();
 
         try{
-            if (this.inReconfiguration) {
+            if (this.inReconfiguration || showPostReconfig) {
                 if(reconfiguration_coordinator.isLive_pull()) {
                 	checkReconfigurationTracking(fragmentIds, parameterSets, ts.isPredictSinglePartition(), ts);
                 } else {
@@ -4143,6 +4143,10 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
                     sb.append(" NULL Range!, ");
                 }   
             }
+            if(showPostReconfig){
+                LOG.info("("+ txn.getTransactionId()+") postsquall Restarts needed due to migrated data : " + restartsNeeded.size() + ", " + sb.toString() + " | ");
+                    
+            } else 
             LOG.info("("+ txn.getTransactionId()+") Restarts needed due to migrated data : " + restartsNeeded.size() + ", " + sb.toString() + " | ");
             
             partitionHistogram.put(partitionsForRestart);
@@ -6593,16 +6597,17 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         }
         
         LOG.info("Clearing up reconfiguration state for p_id " + this.partitionId);
-        if (this.reconfiguration_tracker!=null)
-            this.reconfiguration_tracker.endReconfiguration();
+        //if (this.reconfiguration_tracker!=null)
+          //  this.reconfiguration_tracker.endReconfiguration();
         
     	this.reconfig_plan = null;
     	this.reconfig_state = ReconfigurationState.END;
         this.outgoing_ranges = null;
         this.incoming_ranges = null;
-        this.reconfiguration_tracker = null;
+        //this.reconfiguration_tracker = null;
         this.inReconfiguration = false;
         this.showPostReconfig  = true;
+        LOG.setLevel(Level.DEBUG);
         this.loopCount = 0;
         if (this.currentDtxn != null){
             LOG.info("Cur"

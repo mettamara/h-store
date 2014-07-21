@@ -2858,6 +2858,7 @@ public class HStoreSite implements VoltProcedureListener.Handler, Shutdownable, 
                         TransactionCounter.REJECTED.inc(catalog_proc);
                     break;
                 case ABORT_UNEXPECTED:
+                    LOG.error("Unexpect Abrt "+ ts.toString());
                     if (hstore_conf.site.txn_counters)
                         TransactionCounter.ABORT_UNEXPECTED.inc(catalog_proc);
                     break;

@@ -729,6 +729,9 @@ public abstract class VoltProcedure implements Poolable {
             ClientResponseDebug responseDebug = new ClientResponseDebug(localTxnState);
             response.setDebug(responseDebug);
         }
+        if (this.status == Status.ABORT_UNEXPECTED){
+            LOG.error("VP abort :"+this.status_msg + " : "+ response.toString());
+        }
 
         if (this.observable != null) this.observable.notifyObservers(response);
         if (trace.val) LOG.trace(response);
