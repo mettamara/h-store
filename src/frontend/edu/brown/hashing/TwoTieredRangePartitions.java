@@ -68,7 +68,8 @@ public class TwoTieredRangePartitions extends ExplicitPartitions implements JSON
     	super(catalog_context, partition_json);
     	this.old_partition_plan = null;
         this.partition_plan = null;
-	this.incrementalPlan = null;
+        this.incrementalPlan = null;
+        this.previousIncrementalPlan = null;
 
         if (partition_json.has(PARTITION_PLAN)) {
             JSONObject plan = partition_json.getJSONObject(PARTITION_PLAN);
@@ -157,8 +158,8 @@ public class TwoTieredRangePartitions extends ExplicitPartitions implements JSON
     				return range.getOldPartition();
     			}
     		}
-    		if(this.incrementalPlan != null) {
-    			PartitionedTable table = incrementalPlan.getTable(table_name);
+    		if(this.previousIncrementalPlan != null) {
+    			PartitionedTable table = previousIncrementalPlan.getTable(table_name);
 			assert table != null : "Table not found " + table_name;
 			return table.findPartition(ids);
     		}
@@ -214,8 +215,8 @@ public class TwoTieredRangePartitions extends ExplicitPartitions implements JSON
     				allPartitionIds.add(range.getOldPartition());
     			}
     		}
-    		if(this.incrementalPlan != null) {
-    			PartitionedTable table = incrementalPlan.getTable(table_name);
+    		if(this.previousIncrementalPlan != null) {
+    			PartitionedTable table = previousIncrementalPlan.getTable(table_name);
 			assert table != null : "Table not found " + table_name;
 			allPartitionIds.addAll(table.findAllPartitions(ids));
 	        return allPartitionIds;
@@ -257,7 +258,8 @@ public class TwoTieredRangePartitions extends ExplicitPartitions implements JSON
             		this.old_partition_plan = this.partition_plan;
             		this.partition_plan = new_plan;
             		old_plan = this.old_partition_plan;
-			this.incrementalPlan = null;
+            		this.incrementalPlan = null;
+            		this.previousIncrementalPlan = null;
             	}
             } else {
                 throw new JSONException(String.format("JSON file is missing key \"%s\". ", PARTITION_PLAN));

@@ -126,6 +126,7 @@ import com.google.protobuf.RpcCallback;
 import edu.brown.catalog.CatalogUtil;
 import edu.brown.catalog.PlanFragmentIdGenerator;
 import edu.brown.catalog.special.CountedStatement;
+import edu.brown.hashing.ExplicitHasher;
 import edu.brown.hashing.ExplicitPartitions;
 import edu.brown.hashing.PlannedPartitions.PartitionKeyComparator;
 import edu.brown.hashing.ReconfigurationPlan;
@@ -6519,6 +6520,9 @@ public class PartitionExecutor implements Runnable, Configurable, Shutdownable {
         this.outgoing_ranges = reconfig_plan.getOutgoing_ranges().get(this.partitionId);
         this.incoming_ranges = reconfig_plan.getIncoming_ranges().get(this.partitionId);
         this.reconfiguration_tracker = new ReconfigurationTracking(planned_partitions, reconfig_plan, this.partitionId);
+        if(this.p_estimator.getHasher() instanceof ExplicitHasher) {
+        	((ExplicitHasher) this.p_estimator.getHasher()).getPartitions().setReconfigurationPlan(reconfig_plan);
+        }
         this.queue_async_pulls = false;
         if (asyncOutstanding.getAndSet(false)){
             LOG.warn("Async Outstanding was set to true!!!");

@@ -48,6 +48,7 @@ public abstract class ExplicitPartitions {
 	protected Map<String, List<String>> relatedTablesMap;
 	protected ReconfigurationPlan reconfigurationPlan;
 	protected PartitionPhase incrementalPlan;
+	protected PartitionPhase previousIncrementalPlan;
 	
 	private static final Logger LOG = Logger.getLogger(ExplicitPartitions.class);
     private static final LoggerBoolean debug = new LoggerBoolean(LOG.isDebugEnabled());
@@ -362,7 +363,7 @@ public abstract class ExplicitPartitions {
     	return this.catalog_context;
     }
     
-    public synchronized void setReconfigurationPlan(ReconfigurationPlan reconfigurationPlan) {
+    public void setReconfigurationPlan(ReconfigurationPlan reconfigurationPlan) {
 	if(reconfigurationPlan == null) {
 	    this.reconfigurationPlan = null;
 	    return;
@@ -375,6 +376,7 @@ public abstract class ExplicitPartitions {
 
    	this.reconfigurationPlan = reconfigurationPlan;
     	if(this.incrementalPlan == null) {
+    		this.previousIncrementalPlan = this.getPreviousPlan();
     		this.incrementalPlan = this.getPreviousPlan();
     	}
 	assert (this.reconfigurationPlan.range_map != null) : "Null reconfiguration range map";
@@ -451,6 +453,7 @@ public abstract class ExplicitPartitions {
 	LOG.info("New incremental plan ranges: " + newRanges.toString());
 		
 		try {
+			this.previousIncrementalPlan = this.incrementalPlan;
 			this.incrementalPlan = new PartitionPhase(this.incrementalPlan.catalog_context, newRanges, this.partitionedTablesByFK);
 		} catch (Exception e) {
 			LOG.error(e);

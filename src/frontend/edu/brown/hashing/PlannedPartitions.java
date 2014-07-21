@@ -193,8 +193,8 @@ public class PlannedPartitions extends ExplicitPartitions implements JSONSeriali
     			return range.getOldPartition();
     		}
     	}
-    	if (this.incrementalPlan != null) {
-    		PartitionedTable table = incrementalPlan.getTable(table_name);
+    	if (this.previousIncrementalPlan != null) {
+    		PartitionedTable table = previousIncrementalPlan.getTable(table_name);
     		assert table != null : "Table not found " + table_name;
     		return table.findPartition(ids);
     	}
@@ -253,8 +253,8 @@ public class PlannedPartitions extends ExplicitPartitions implements JSONSeriali
         		allPartitionIds.add(range.getOldPartition());
         	}
         }
-        if (this.incrementalPlan != null) {
-        	PartitionedTable table = incrementalPlan.getTable(table_name);
+        if (this.previousIncrementalPlan != null) {
+        	PartitionedTable table = previousIncrementalPlan.getTable(table_name);
         	assert table != null : "Table not found " + table_name;
         	allPartitionIds.addAll(table.findAllPartitions(ids));
         	return allPartitionIds;
@@ -745,6 +745,7 @@ public class PlannedPartitions extends ExplicitPartitions implements JSONSeriali
         this.current_phase = new_phase;
         this.previous_phase = old_phase;
         this.incrementalPlan = null;
+        this.previousIncrementalPlan = null;
         
         try {
             if (old_phase == null) {
